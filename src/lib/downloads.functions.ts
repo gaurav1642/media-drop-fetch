@@ -48,6 +48,11 @@ export const fetchMedia = createServerFn({ method: "POST" })
 
     if (!res.ok) {
       const text = await res.text().catch(() => "Unknown error");
+      if (text.includes("auth") || text.includes("jwt") || text.includes("turnstile")) {
+        throw new Error(
+          "The public Cobalt instance requires authentication. Set your COBALT_BASE_URL environment variable to a self-hosted instance."
+        );
+      }
       throw new Error(`Cobalt returned ${res.status}: ${text}`);
     }
 
