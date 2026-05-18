@@ -5,7 +5,18 @@ import { SiteLayout } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Download, Loader2, Trash2, LogOut, ExternalLink } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { fetchMedia, saveDownloadRecord } from "@/lib/downloads.functions";
+import {
+  Download,
+  Loader2,
+  Trash2,
+  LogOut,
+  ExternalLink,
+  FileAudio,
+  FileVideo,
+  CheckCircle2,
+} from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
   component: Dashboard,
@@ -18,6 +29,8 @@ type DownloadRow = {
   platform: string | null;
   title: string | null;
   status: string;
+  download_url: string | null;
+  format: string | null;
   created_at: string;
 };
 
@@ -38,7 +51,11 @@ function Dashboard() {
   const [email, setEmail] = useState<string>("");
   const [rows, setRows] = useState<DownloadRow[]>([]);
   const [url, setUrl] = useState("");
+  const [format, setFormat] = useState<"auto" | "audio">("auto");
   const [busy, setBusy] = useState(false);
+
+  const fetchMediaFn = useServerFn(fetchMedia);
+  const saveRecordFn = useServerFn(saveDownloadRecord);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -56,7 +73,7 @@ function Dashboard() {
   const load = async () => {
     const { data, error } = await supabase
       .from("downloads")
-      .select("id,source_url,platform,title,status,created_at")
+      .select("id,source_url,platform,title,status,download_url,format,created_at")
       .order("created_at", { ascending: false })
       .limit(50);
     if (error) toast.error(error.message);
@@ -72,22 +89,35 @@ function Dashboard() {
       return;
     }
     setBusy(true);
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) return;
-    const { error } = await supabase.from("downloads").insert({
-      user_id: user.user.id,
-      source_url: url,
-      platform,
-      status: "queued",
-    });
-    setBusy(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+
+    try {
+      const res = await fetchMediaFn({ data: { url, format } });
+      const downloadUrl = res.result.url || res.result.picker?.[0]?.url;
+      const status =
+        res.result.status === "tunnel" || res.result.status === "redirect" || res.result.status === "picker"
+          ? "ready"
+          : "error";
+
+      await saveRecordFn({
+        data: {
+          source_url: url,
+          platform,
+          status,
+          download_url: downloadUrl,
+          title: res.result.text || undefined,
+          format,
+        },
+      });
+
+      setUrl("");
+      toast.success(status === "ready" ? "Download ready" : "Processed with issues");
+      load();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      toast.error(msg);
+    } finally {
+      setBusy(false);
     }
-    setUrl("");
-    toast.success("Saved to history (download engine coming soon)");
-    load();
   };
 
   const remove = async (id: string) => {
@@ -132,12 +162,39 @@ function Dashboard() {
             <Input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="Paste a URL to save it to your history…"
+              placeholder="Paste a URL to fetch media…"
               className="flex-1 bg-transparent border-0 h-11 focus-visible:ring-0 px-4"
             />
-            <Button type="submit" disabled={busy} className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow h-11">
-              <Download className="h-4 w-4 mr-2" /> Add to history
-            </Button>
+            <div className="flex gap-2">
+              <div className="inline-flex gap-1 rounded-lg border border-border/40 p-1 glass self-center">
+                <button
+                  type="button"
+                  onClick={() => setFormat("auto")}
+                  className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
+                    format === "auto"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <FileVideo className="h-3.5 w-3.5 inline mr-1" /> Video
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormat("audio")}
+                  className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
+                    format === "audio"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <FileAudio className="h-3.5 w-3.5 inline mr-1" /> Audio
+                </button>
+              </div>
+              <Button type="submit" disabled={busy} className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow h-11">
+                {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                Fetch
+              </Button>
+            </div>
           </form>
 
           <h2 className="font-display text-xl font-semibold mb-4">History</h2>
@@ -150,19 +207,35 @@ function Dashboard() {
               {rows.map((r) => (
                 <li key={r.id} className="glass rounded-xl p-4 flex items-center gap-4">
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-gradient-brand">
-                    <Download className="h-4 w-4 text-primary-foreground" />
+                    {r.status === "ready" ? (
+                      <CheckCircle2 className="h-4 w-4 text-primary-foreground" />
+                    ) : (
+                      <Download className="h-4 w-4 text-primary-foreground" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{r.title || r.source_url}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                    <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
                       <span className="px-1.5 py-0.5 rounded bg-muted/60">{r.platform ?? "Unknown"}</span>
                       <span>{new Date(r.created_at).toLocaleString()}</span>
-                      <span className="text-accent">{r.status}</span>
+                      <span className={r.status === "ready" ? "text-emerald-400" : "text-accent"}>{r.status}</span>
+                      {r.format === "audio" && <span className="px-1.5 py-0.5 rounded bg-muted/60">MP3</span>}
                     </div>
                   </div>
-                  <a href={r.source_url} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground p-2">
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
+                  {r.download_url ? (
+                    <a
+                      href={r.download_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow px-3 py-1.5 text-xs font-medium"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Download
+                    </a>
+                  ) : (
+                    <a href={r.source_url} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground p-2">
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  )}
                   <button onClick={() => remove(r.id)} className="text-muted-foreground hover:text-destructive p-2" aria-label="Delete">
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -175,3 +248,4 @@ function Dashboard() {
     </SiteLayout>
   );
 }
+
