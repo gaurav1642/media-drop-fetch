@@ -91,7 +91,10 @@ function Home() {
         data: { session },
       } = await supabase.auth.getSession();
       if (session) {
-        const status = data.result.status === "tunnel" || data.result.status === "redirect" || data.result.status === "picker" ? "ready" : "error";
+        const status =
+          data.result.status === "tunnel" || data.result.status === "redirect" || data.result.status === "picker"
+            ? "ready"
+            : "error";
         const downloadUrl = data.result.url || data.result.picker?.[0]?.url;
         await saveRecordFn({
           data: {
@@ -99,7 +102,7 @@ function Home() {
             platform: data.platform,
             status,
             download_url: downloadUrl,
-            title: data.result.text || undefined,
+            title: data.result.filename || data.result.picker?.[0]?.type || undefined,
             format,
           },
         }).catch(() => {
@@ -108,7 +111,7 @@ function Home() {
       }
 
       if (data.result.status === "error") {
-        toast.error(data.result.text || "Download failed.");
+        toast.error("Download failed.");
       } else if (data.result.status === "picker") {
         toast.success("Pick a version below");
       } else {
