@@ -1,0 +1,1 @@
+ALTER TABLE public.downloads ADD COLUMN download_url text;
