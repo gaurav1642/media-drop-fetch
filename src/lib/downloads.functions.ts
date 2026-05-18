@@ -56,15 +56,15 @@ export const fetchMedia = createServerFn({ method: "POST" })
       url?: string;
       filename?: string;
       picker?: Array<{ url: string; type: string; thumb?: string }>;
-      error?: { code: string; context?: Record<string, unknown> };
     };
 
     if (result.status === "error") {
-      throw new Error(result.error?.code || "Cobalt processing failed.");
+      throw new Error("Cobalt processing failed.");
     }
 
     return { platform, result };
   });
+
 
 export const saveDownloadRecord = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
