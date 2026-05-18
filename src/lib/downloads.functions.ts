@@ -37,9 +37,12 @@ export const fetchMedia = createServerFn({ method: "POST" })
       body.audioFormat = "mp3";
     }
 
-    const res = await fetch(`${COBALT_BASE_URL}/api/json`, {
+    const res = await fetch(`${COBALT_BASE_URL}/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
       body: JSON.stringify(body),
     });
 
@@ -51,12 +54,13 @@ export const fetchMedia = createServerFn({ method: "POST" })
     const result = (await res.json()) as {
       status: string;
       url?: string;
-      picker?: Array<{ url: string; type: string }>;
-      text?: string;
+      filename?: string;
+      picker?: Array<{ url: string; type: string; thumb?: string }>;
+      error?: { code: string; context?: Record<string, unknown> };
     };
 
     if (result.status === "error") {
-      throw new Error(result.text || "Cobalt processing failed.");
+      throw new Error(result.error?.code || "Cobalt processing failed.");
     }
 
     return { platform, result };
@@ -88,3 +92,4 @@ export const saveDownloadRecord = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { success: true };
   });
+
