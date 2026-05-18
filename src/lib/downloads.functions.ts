@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const COBALT_BASE_URL = "https://api.cobalt.tools";
+const COBALT_BASE_URL = process.env.COBALT_BASE_URL || "https://api.cobalt.tools";
 
 function detectPlatform(url: string): string | null {
   const u = url.toLowerCase();
