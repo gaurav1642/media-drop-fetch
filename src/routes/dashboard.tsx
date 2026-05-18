@@ -104,7 +104,7 @@ function Dashboard() {
           platform,
           status,
           download_url: downloadUrl,
-          title: res.result.text || undefined,
+          title: res.result.filename || res.result.picker?.[0]?.type || undefined,
           format,
         },
       });
