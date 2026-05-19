@@ -17,7 +17,6 @@ export type Database = {
       downloads: {
         Row: {
           created_at: string
-          download_url: string | null
           duration_seconds: number | null
           format: string | null
           id: string
@@ -31,7 +30,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          download_url?: string | null
           duration_seconds?: number | null
           format?: string | null
           id?: string
@@ -45,7 +43,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          download_url?: string | null
           duration_seconds?: number | null
           format?: string | null
           id?: string

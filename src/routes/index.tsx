@@ -4,9 +4,6 @@ import { toast } from "sonner";
 import { SiteLayout } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useServerFn } from "@tanstack/react-start";
-import { fetchMedia, saveDownloadRecord } from "@/lib/downloads.functions";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Download,
   Sparkles,
@@ -17,10 +14,6 @@ import {
   Zap,
   Globe,
   AlertTriangle,
-  Loader2,
-  FileAudio,
-  FileVideo,
-  CheckCircle2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -51,25 +44,11 @@ function detectPlatform(url: string): string | null {
   return null;
 }
 
-type CobaltResult = {
-  status: string;
-  url?: string;
-  picker?: Array<{ url: string; type: string }>;
-  text?: string;
-};
-
 function Home() {
   const [url, setUrl] = useState("");
-  const [format, setFormat] = useState<"auto" | "audio">("auto");
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ platform: string; result: CobaltResult } | null>(null);
-
-  const fetchMediaFn = useServerFn(fetchMedia);
-  const saveRecordFn = useServerFn(saveDownloadRecord);
-
   const platform = detectPlatform(url);
 
-  const onFetch = async (e: React.FormEvent) => {
+  const onFetch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) {
       toast.error("Paste a URL first");
@@ -79,50 +58,9 @@ function Home() {
       toast.error("URL not recognized. Try YouTube, Instagram, TikTok, Facebook, X, or Vimeo.");
       return;
     }
-
-    setBusy(true);
-    setResult(null);
-
-    try {
-      const data = await fetchMediaFn({ data: { url, format } });
-      setResult(data);
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session) {
-        const status =
-          data.result.status === "tunnel" || data.result.status === "redirect" || data.result.status === "picker"
-            ? "ready"
-            : "error";
-        const downloadUrl = data.result.url || data.result.picker?.[0]?.url;
-        await saveRecordFn({
-          data: {
-            source_url: url,
-            platform: data.platform,
-            status,
-            download_url: downloadUrl,
-            title: data.result.filename || data.result.picker?.[0]?.type || undefined,
-            format,
-          },
-        }).catch(() => {
-          // non-critical
-        });
-      }
-
-      if (data.result.status === "error") {
-        toast.error("Download failed.");
-      } else if (data.result.status === "picker") {
-        toast.success("Pick a version below");
-      } else {
-        toast.success("Ready to download");
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Something went wrong";
-      toast.error(msg);
-    } finally {
-      setBusy(false);
-    }
+    toast.info("Download engine coming soon", {
+      description: "Sign in to save this link to your history.",
+    });
   };
 
   return (
@@ -158,97 +96,16 @@ function Home() {
               <Button
                 type="submit"
                 size="lg"
-                disabled={busy}
                 className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow h-12 px-6"
               >
-                {busy ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
+                <Download className="h-4 w-4 mr-2" />
                 Fetch media
               </Button>
             </div>
             {platform && (
               <p className="mt-3 text-xs text-accent">Detected: {platform}</p>
             )}
-
-            {/* Format toggle */}
-            <div className="mt-4 inline-flex gap-1 rounded-xl border border-border/40 p-1 glass">
-              <button
-                type="button"
-                onClick={() => setFormat("auto")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
-                  format === "auto"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <FileVideo className="h-4 w-4" /> Video
-              </button>
-              <button
-                type="button"
-                onClick={() => setFormat("audio")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
-                  format === "audio"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <FileAudio className="h-4 w-4" /> Audio
-              </button>
-            </div>
           </form>
-
-          {/* Result card */}
-          {result && (
-            <div className="mx-auto mt-8 max-w-2xl text-left">
-              <div className="glass rounded-2xl p-5 shadow-card border border-primary/20">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-brand">
-                    <CheckCircle2 className="h-5 w-5 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <p className="font-medium">{result.platform} — {result.result.text || "Media ready"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {result.result.status === "picker" ? "Choose a version" : "Click to download"}
-                    </p>
-                  </div>
-                </div>
-
-                {result.result.status === "tunnel" || result.result.status === "redirect" ? (
-                  <a
-                    href={result.result.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center justify-center rounded-lg bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow px-5 py-2.5 text-sm font-medium"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download {format === "audio" ? "MP3" : "MP4"}
-                  </a>
-                ) : result.result.status === "picker" && result.result.picker ? (
-                  <div className="space-y-2">
-                    {result.result.picker.map((item, i) => (
-                      <a
-                        key={i}
-                        href={item.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-between rounded-lg border border-border/40 px-4 py-2.5 text-sm hover:bg-muted/40 transition-colors"
-                      >
-                        <span className="capitalize">{item.type || "file"}</span>
-                        <Download className="h-4 w-4 text-muted-foreground" />
-                      </a>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    {result.result.text || "No direct link returned."}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
             {platforms.map((p) => (
@@ -327,4 +184,3 @@ function Home() {
     </SiteLayout>
   );
 }
-
