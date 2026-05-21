@@ -1,9 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { SiteLayout } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
+import { fetchMedia } from "@/lib/cobalt.functions";
 import {
   Download,
   Sparkles,
@@ -14,6 +17,7 @@ import {
   Zap,
   Globe,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -44,11 +48,28 @@ function detectPlatform(url: string): string | null {
   return null;
 }
 
+type Result = { url: string; filename?: string; mode: "auto" | "audio" };
+
 function Home() {
   const [url, setUrl] = useState("");
+  const [mode, setMode] = useState<"auto" | "audio">("auto");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<Result | null>(null);
   const platform = detectPlatform(url);
+  const fetchMediaFn = useServerFn(fetchMedia);
 
-  const onFetch = (e: React.FormEvent) => {
+  const saveHistory = async (status: string) => {
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) return;
+    await supabase.from("downloads").insert({
+      user_id: data.session.user.id,
+      source_url: url,
+      platform,
+      status,
+    });
+  };
+
+  const onFetch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) {
       toast.error("Paste a URL first");
@@ -58,9 +79,24 @@ function Home() {
       toast.error("URL not recognized. Try YouTube, Instagram, TikTok, Facebook, X, or Vimeo.");
       return;
     }
-    toast.info("Download engine coming soon", {
-      description: "Sign in to save this link to your history.",
-    });
+    setBusy(true);
+    setResult(null);
+    try {
+      const res = await fetchMediaFn({ data: { url, mode, quality: "1080", audioFormat: "mp3" } });
+      if (!res.ok) {
+        toast.error(res.error);
+        await saveHistory("failed");
+        return;
+      }
+      setResult({ url: res.url, filename: res.filename, mode });
+      toast.success("Your file is ready");
+      await saveHistory("ready");
+    } catch (err) {
+      console.error(err);
+      toast.error("Something went wrong. Try again.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -92,18 +128,55 @@ function Home() {
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="Paste a YouTube, Instagram, TikTok, X, or Vimeo URL…"
                 className="flex-1 bg-transparent border-0 h-12 text-base focus-visible:ring-0 px-4"
+                disabled={busy}
               />
               <Button
                 type="submit"
                 size="lg"
+                disabled={busy}
                 className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow h-12 px-6"
               >
-                <Download className="h-4 w-4 mr-2" />
-                Fetch media
+                {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                {busy ? "Fetching…" : "Fetch media"}
               </Button>
             </div>
-            {platform && (
+
+            <div className="mt-4 inline-flex glass rounded-full p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setMode("auto")}
+                className={`px-4 py-1.5 rounded-full transition-colors ${mode === "auto" ? "bg-gradient-brand text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Video className="h-3 w-3 inline mr-1.5" />Video
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("audio")}
+                className={`px-4 py-1.5 rounded-full transition-colors ${mode === "audio" ? "bg-gradient-brand text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Music className="h-3 w-3 inline mr-1.5" />Audio (MP3)
+              </button>
+            </div>
+
+            {platform && !result && (
               <p className="mt-3 text-xs text-accent">Detected: {platform}</p>
+            )}
+
+            {result && (
+              <div className="mt-6 glass rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-4 text-left">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">Ready to download</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {result.filename ?? (result.mode === "audio" ? "audio file" : "video file")}
+                  </p>
+                </div>
+                <Button asChild className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow">
+                  <a href={result.url} target="_blank" rel="noopener noreferrer" download>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </a>
+                </Button>
+              </div>
             )}
           </form>
 
