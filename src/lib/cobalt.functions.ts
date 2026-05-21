@@ -53,7 +53,18 @@ export const fetchMedia = createServerFn({ method: "POST" })
     const json = (await res.json()) as CobaltResponse;
 
     if (json.status === "error") {
-      return { ok: false as const, error: `Could not process this link (${json.error.code}).` };
+      const code = json.error.code;
+      const ctx = json.error.context as { service?: string } | undefined;
+      if (code === "content.no_valid_content" && ctx?.service === "youtube") {
+        return {
+          ok: false as const,
+          error: "YouTube is currently blocking public download servers. Try Instagram, TikTok, X, Facebook, or Vimeo instead.",
+        };
+      }
+      if (code === "content.no_valid_content") {
+        return { ok: false as const, error: "No public servers could fetch this link right now. Try again later." };
+      }
+      return { ok: false as const, error: `Could not process this link (${code}).` };
     }
 
     if (json.status === "picker") {
