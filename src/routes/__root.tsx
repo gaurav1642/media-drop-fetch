@@ -80,6 +80,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:site_name", content: "MediaDrop" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:title", content: "MediaDrop — Save the media you own" },
+      { name: "twitter:title", content: "MediaDrop — Save the media you own" },
+      { property: "og:description", content: "Paste a public video URL and grab MP4, MP3, or the thumbnail. Built for creators who respect copyright." },
+      { name: "twitter:description", content: "Paste a public video URL and grab MP4, MP3, or the thumbnail. Built for creators who respect copyright." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/e7b278e0-e4a9-4610-a177-c48edfe24429" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/e7b278e0-e4a9-4610-a177-c48edfe24429" },
     ],
     links: [
       {
