@@ -54,9 +54,42 @@ function Home() {
   const [url, setUrl] = useState("");
   const [mode, setMode] = useState<"auto" | "audio">("auto");
   const [busy, setBusy] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const platform = detectPlatform(url);
   const fetchMediaFn = useServerFn(fetchMedia);
+
+  const buildFilename = (r: Result) => {
+    if (r.filename) return r.filename;
+    const ext = r.mode === "audio" ? "mp3" : "mp4";
+    const plat = (platform ?? "media").toLowerCase().replace(/[^a-z0-9]/g, "");
+    return `mediadrop-${plat}-${Date.now()}.${ext}`;
+  };
+
+  const handleDownload = async (r: Result) => {
+    setDownloading(true);
+    const filename = buildFilename(r);
+    try {
+      const res = await fetch(r.url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      toast.success("Download started");
+    } catch (err) {
+      console.error("Direct download failed:", err);
+      toast.error("Browser blocked the direct save — opening in a new tab so you can save manually.");
+      window.open(r.url, "_blank", "noopener,noreferrer");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const saveHistory = async (status: string) => {
     const { data } = await supabase.auth.getSession();
