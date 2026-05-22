@@ -203,11 +203,13 @@ function Home() {
                     {result.filename ?? (result.mode === "audio" ? "audio file" : "video file")}
                   </p>
                 </div>
-                <Button asChild className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow">
-                  <a href={result.url} target="_blank" rel="noopener noreferrer" download>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
-                  </a>
+                <Button
+                  onClick={() => handleDownload(result)}
+                  disabled={downloading}
+                  className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow"
+                >
+                  {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                  {downloading ? "Saving…" : "Download"}
                 </Button>
               </div>
             )}
