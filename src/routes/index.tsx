@@ -5,6 +5,13 @@ import { toast } from "sonner";
 import { SiteLayout } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchMedia } from "@/lib/cobalt.functions";
 import {
@@ -12,12 +19,16 @@ import {
   Sparkles,
   Music,
   Video,
+  VideoOff,
   Image as ImageIcon,
   ShieldCheck,
   Zap,
   Globe,
   AlertTriangle,
   Loader2,
+  ClipboardPaste,
+  Copy,
+  Check,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -48,20 +59,26 @@ function detectPlatform(url: string): string | null {
   return null;
 }
 
-type Result = { url: string; filename?: string; mode: "auto" | "audio" };
+type Mode = "auto" | "audio" | "mute";
+type Quality = "360" | "480" | "720" | "1080" | "1440" | "2160" | "max";
+type AudioFormat = "mp3" | "wav" | "opus" | "best";
+type Result = { url: string; filename?: string; mode: Mode };
 
 function Home() {
   const [url, setUrl] = useState("");
-  const [mode, setMode] = useState<"auto" | "audio">("auto");
+  const [mode, setMode] = useState<Mode>("auto");
+  const [quality, setQuality] = useState<Quality>("1080");
+  const [audioFormat, setAudioFormat] = useState<AudioFormat>("mp3");
   const [busy, setBusy] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const platform = detectPlatform(url);
   const fetchMediaFn = useServerFn(fetchMedia);
 
   const buildFilename = (r: Result) => {
     if (r.filename) return r.filename;
-    const ext = r.mode === "audio" ? "mp3" : "mp4";
+    const ext = r.mode === "audio" ? audioFormat === "best" ? "opus" : audioFormat : "mp4";
     const plat = (platform ?? "media").toLowerCase().replace(/[^a-z0-9]/g, "");
     return `mediadrop-${plat}-${Date.now()}.${ext}`;
   };
@@ -91,6 +108,32 @@ function Home() {
     }
   };
 
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) {
+        toast.error("Clipboard is empty");
+        return;
+      }
+      setUrl(text.trim());
+      toast.success("Pasted from clipboard");
+    } catch {
+      toast.error("Couldn't read clipboard — paste manually");
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!result) return;
+    try {
+      await navigator.clipboard.writeText(result.url);
+      setCopied(true);
+      toast.success("Direct link copied");
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Couldn't copy link");
+    }
+  };
+
   const saveHistory = async (status: string) => {
     const { data } = await supabase.auth.getSession();
     if (!data.session) return;
@@ -115,7 +158,7 @@ function Home() {
     setBusy(true);
     setResult(null);
     try {
-      const res = await fetchMediaFn({ data: { url, mode, quality: "1080", audioFormat: "mp3" } });
+      const res = await fetchMediaFn({ data: { url, mode, quality, audioFormat } });
       if (!res.ok) {
         toast.error(res.error);
         await saveHistory("failed");
@@ -156,13 +199,24 @@ function Home() {
           {/* URL input */}
           <form onSubmit={onFetch} className="mx-auto mt-10 max-w-2xl">
             <div className="glass rounded-2xl p-2 flex flex-col sm:flex-row gap-2 shadow-card">
-              <Input
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="Paste a YouTube, Instagram, TikTok, X, or Vimeo URL…"
-                className="flex-1 bg-transparent border-0 h-12 text-base focus-visible:ring-0 px-4"
-                disabled={busy}
-              />
+              <div className="relative flex-1">
+                <Input
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="Paste a YouTube, Instagram, TikTok, X, or Vimeo URL…"
+                  className="bg-transparent border-0 h-12 text-base focus-visible:ring-0 px-4 pr-12 w-full"
+                  disabled={busy}
+                />
+                <button
+                  type="button"
+                  onClick={handlePaste}
+                  disabled={busy}
+                  aria-label="Paste from clipboard"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                >
+                  <ClipboardPaste className="h-4 w-4" />
+                </button>
+              </div>
               <Button
                 type="submit"
                 size="lg"
@@ -174,21 +228,59 @@ function Home() {
               </Button>
             </div>
 
-            <div className="mt-4 inline-flex glass rounded-full p-1 text-xs">
-              <button
-                type="button"
-                onClick={() => setMode("auto")}
-                className={`px-4 py-1.5 rounded-full transition-colors ${mode === "auto" ? "bg-gradient-brand text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                <Video className="h-3 w-3 inline mr-1.5" />Video
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("audio")}
-                className={`px-4 py-1.5 rounded-full transition-colors ${mode === "audio" ? "bg-gradient-brand text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                <Music className="h-3 w-3 inline mr-1.5" />Audio (MP3)
-              </button>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+              <div className="inline-flex glass rounded-full p-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setMode("auto")}
+                  className={`px-4 py-1.5 rounded-full transition-colors ${mode === "auto" ? "bg-gradient-brand text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Video className="h-3 w-3 inline mr-1.5" />Video
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("audio")}
+                  className={`px-4 py-1.5 rounded-full transition-colors ${mode === "audio" ? "bg-gradient-brand text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Music className="h-3 w-3 inline mr-1.5" />Audio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("mute")}
+                  className={`px-4 py-1.5 rounded-full transition-colors ${mode === "mute" ? "bg-gradient-brand text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <VideoOff className="h-3 w-3 inline mr-1.5" />Mute
+                </button>
+              </div>
+
+              {mode !== "audio" ? (
+                <Select value={quality} onValueChange={(v) => setQuality(v as Quality)}>
+                  <SelectTrigger className="h-8 w-[130px] text-xs glass border-0 rounded-full">
+                    <SelectValue placeholder="Quality" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="360">360p</SelectItem>
+                    <SelectItem value="480">480p</SelectItem>
+                    <SelectItem value="720">720p HD</SelectItem>
+                    <SelectItem value="1080">1080p Full HD</SelectItem>
+                    <SelectItem value="1440">1440p 2K</SelectItem>
+                    <SelectItem value="2160">2160p 4K</SelectItem>
+                    <SelectItem value="max">Max available</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Select value={audioFormat} onValueChange={(v) => setAudioFormat(v as AudioFormat)}>
+                  <SelectTrigger className="h-8 w-[130px] text-xs glass border-0 rounded-full">
+                    <SelectValue placeholder="Format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mp3">MP3</SelectItem>
+                    <SelectItem value="wav">WAV</SelectItem>
+                    <SelectItem value="opus">Opus</SelectItem>
+                    <SelectItem value="best">Best</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {platform && !result && (
@@ -204,6 +296,17 @@ function Home() {
                   </p>
                 </div>
                 <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopyLink}
+                  className="h-9"
+                >
+                  {copied ? <Check className="h-4 w-4 mr-1.5" /> : <Copy className="h-4 w-4 mr-1.5" />}
+                  {copied ? "Copied" : "Copy link"}
+                </Button>
+                <Button
+                  type="button"
                   onClick={() => handleDownload(result)}
                   disabled={downloading}
                   className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow"
@@ -251,8 +354,8 @@ function Home() {
 
           <div className="grid md:grid-cols-3 gap-5">
             {[
-              { icon: Video, title: "MP4 video", desc: "Up to 1080p with smart fallback to the best available stream." },
-              { icon: Music, title: "MP3 audio", desc: "Strip the audio track and download a clean encoded file." },
+              { icon: Video, title: "MP4 video", desc: "Up to 4K with smart fallback to the best available stream." },
+              { icon: Music, title: "MP3 audio", desc: "Strip the audio track and download MP3, WAV, or Opus." },
               { icon: ImageIcon, title: "Thumbnail", desc: "Grab the cover image in original resolution." },
               { icon: Zap, title: "Fast queue", desc: "Background processing so you can paste the next link immediately." },
               { icon: ShieldCheck, title: "Private by default", desc: "Files are auto-deleted shortly after they're ready." },
