@@ -16,15 +16,14 @@ type CobaltResponse =
 export const fetchMedia = createServerFn({ method: "POST" })
   .inputValidator((input) => InputSchema.parse(input))
   .handler(async ({ data }) => {
-    const apiUrl = process.env.COBALT_API_URL || "https://dwnld.nichind.dev";
-    const apiKey = process.env.COBALT_API_KEY;
+    // Free public Cobalt instance — no API key required.
+    const apiUrl = "https://dwnld.nichind.dev";
 
     const headers: Record<string, string> = {
       "Accept": "application/json",
       "Content-Type": "application/json",
       "User-Agent": "MediaDrop/1.0",
     };
-    if (apiKey) headers["Authorization"] = `Api-Key ${apiKey}`;
 
     let res: Response;
     try {
