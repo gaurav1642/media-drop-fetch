@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { SiteLayout } from "@/components/SiteLayout";
@@ -15,6 +15,16 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { fetchMedia } from "@/lib/cobalt.functions";
 import {
+  PLAN_LIMITS,
+  type Plan,
+  audioAllowed,
+  bumpAnonUsage,
+  clampQuality,
+  getCurrentPlan,
+  getTodayUsage,
+  qualityAllowed,
+} from "@/lib/plan";
+import {
   Download,
   Sparkles,
   Music,
@@ -29,6 +39,7 @@ import {
   ClipboardPaste,
   Copy,
   Check,
+  Lock,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -64,17 +75,60 @@ type Quality = "360" | "480" | "720" | "1080" | "1440" | "2160" | "max";
 type AudioFormat = "mp3" | "wav" | "opus" | "best";
 type Result = { url: string; filename?: string; mode: Mode };
 
+const ALL_QUALITIES: Array<{ value: Quality; label: string }> = [
+  { value: "360", label: "360p" },
+  { value: "480", label: "480p" },
+  { value: "720", label: "720p HD" },
+  { value: "1080", label: "1080p Full HD" },
+  { value: "1440", label: "1440p 2K" },
+  { value: "2160", label: "2160p 4K" },
+  { value: "max", label: "Max available" },
+];
+
+const ALL_AUDIO: Array<{ value: AudioFormat; label: string }> = [
+  { value: "mp3", label: "MP3" },
+  { value: "wav", label: "WAV" },
+  { value: "opus", label: "Opus" },
+  { value: "best", label: "Best" },
+];
+
 function Home() {
   const [url, setUrl] = useState("");
   const [mode, setMode] = useState<Mode>("auto");
-  const [quality, setQuality] = useState<Quality>("1080");
+  const [quality, setQuality] = useState<Quality>("720");
   const [audioFormat, setAudioFormat] = useState<AudioFormat>("mp3");
   const [busy, setBusy] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
+  const [plan, setPlan] = useState<Plan>("free");
+  const [usage, setUsage] = useState(0);
+  const [signedIn, setSignedIn] = useState(false);
   const platform = detectPlatform(url);
   const fetchMediaFn = useServerFn(fetchMedia);
+
+  const limits = PLAN_LIMITS[plan];
+  const remaining = limits.dailyFetches === Infinity ? Infinity : Math.max(0, limits.dailyFetches - usage);
+  const overLimit = remaining === 0;
+
+  const refreshUsage = async () => {
+    const [p, u, sess] = await Promise.all([
+      getCurrentPlan(),
+      getTodayUsage(),
+      supabase.auth.getSession(),
+    ]);
+    setPlan(p);
+    setUsage(u);
+    setSignedIn(!!sess.data.session);
+    // Clamp current quality to plan if needed
+    setQuality((q) => clampQuality(p, q) as Quality);
+  };
+
+  useEffect(() => {
+    refreshUsage();
+    const { data: sub } = supabase.auth.onAuthStateChange(() => refreshUsage());
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   const buildFilename = (r: Result) => {
     if (r.filename) return r.filename;
@@ -155,6 +209,25 @@ function Home() {
       toast.error("URL not recognized. Try YouTube, Instagram, TikTok, Facebook, X, or Vimeo.");
       return;
     }
+
+    // Enforce plan limits
+    if (overLimit) {
+      toast.error(
+        signedIn
+          ? `Daily limit reached (${limits.dailyFetches}/day on ${plan}). Upgrade to Pro for unlimited fetches.`
+          : `Daily limit reached. Create a free account or upgrade for more.`,
+      );
+      return;
+    }
+    if (!qualityAllowed(plan, quality)) {
+      toast.error(`${quality === "max" ? "Max" : quality + "p"} is locked on ${plan}. Upgrade to unlock.`);
+      return;
+    }
+    if (mode === "audio" && !audioAllowed(plan, audioFormat)) {
+      toast.error(`${audioFormat.toUpperCase()} audio is locked on ${plan}. MP3 is free.`);
+      return;
+    }
+
     setBusy(true);
     setResult(null);
     try {
@@ -167,6 +240,8 @@ function Home() {
       setResult({ url: res.url, filename: res.filename, mode });
       toast.success("Your file is ready");
       await saveHistory("ready");
+      if (!signedIn) bumpAnonUsage();
+      refreshUsage();
     } catch (err) {
       console.error(err);
       toast.error("Something went wrong. Try again.");
@@ -220,7 +295,7 @@ function Home() {
               <Button
                 type="submit"
                 size="lg"
-                disabled={busy}
+                disabled={busy || overLimit}
                 className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow h-12 px-6"
               >
                 {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
@@ -255,36 +330,65 @@ function Home() {
 
               {mode !== "audio" ? (
                 <Select value={quality} onValueChange={(v) => setQuality(v as Quality)}>
-                  <SelectTrigger className="h-8 w-[130px] text-xs glass border-0 rounded-full">
+                  <SelectTrigger className="h-8 w-[160px] text-xs glass border-0 rounded-full">
                     <SelectValue placeholder="Quality" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="360">360p</SelectItem>
-                    <SelectItem value="480">480p</SelectItem>
-                    <SelectItem value="720">720p HD</SelectItem>
-                    <SelectItem value="1080">1080p Full HD</SelectItem>
-                    <SelectItem value="1440">1440p 2K</SelectItem>
-                    <SelectItem value="2160">2160p 4K</SelectItem>
-                    <SelectItem value="max">Max available</SelectItem>
+                    {ALL_QUALITIES.map((q) => {
+                      const locked = !qualityAllowed(plan, q.value);
+                      return (
+                        <SelectItem key={q.value} value={q.value} disabled={locked}>
+                          <span className="flex items-center gap-2">
+                            {q.label}
+                            {locked && <Lock className="h-3 w-3 opacity-60" />}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               ) : (
                 <Select value={audioFormat} onValueChange={(v) => setAudioFormat(v as AudioFormat)}>
-                  <SelectTrigger className="h-8 w-[130px] text-xs glass border-0 rounded-full">
+                  <SelectTrigger className="h-8 w-[140px] text-xs glass border-0 rounded-full">
                     <SelectValue placeholder="Format" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="mp3">MP3</SelectItem>
-                    <SelectItem value="wav">WAV</SelectItem>
-                    <SelectItem value="opus">Opus</SelectItem>
-                    <SelectItem value="best">Best</SelectItem>
+                    {ALL_AUDIO.map((a) => {
+                      const locked = !audioAllowed(plan, a.value);
+                      return (
+                        <SelectItem key={a.value} value={a.value} disabled={locked}>
+                          <span className="flex items-center gap-2">
+                            {a.label}
+                            {locked && <Lock className="h-3 w-3 opacity-60" />}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               )}
+
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full glass text-muted-foreground capitalize">
+                <Sparkles className="h-3 w-3 text-accent" />
+                {plan} plan
+                {limits.dailyFetches !== Infinity && (
+                  <span className="ml-1">· {remaining}/{limits.dailyFetches} left today</span>
+                )}
+              </span>
             </div>
 
             {platform && !result && (
               <p className="mt-3 text-xs text-accent">Detected: {platform}</p>
+            )}
+
+            {overLimit && (
+              <div className="mt-4 glass rounded-xl p-4 border-accent/30 text-sm text-muted-foreground flex items-center justify-center gap-3 flex-wrap">
+                <Lock className="h-4 w-4 text-accent" />
+                <span>You've hit today's free limit.</span>
+                <Link to="/pricing" className="text-accent font-medium hover:underline">
+                  Upgrade to Pro →
+                </Link>
+              </div>
             )}
 
             {result && (

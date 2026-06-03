@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,7 @@ import { SiteLayout } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { PLAN_LIMITS, type Plan, getCurrentPlan, getTodayUsage } from "@/lib/plan";
 import {
   Download,
   Loader2,
@@ -19,6 +20,8 @@ import {
   Clock,
   BarChart3,
   RefreshCw,
+  Sparkles,
+  Crown,
 } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
@@ -56,6 +59,9 @@ function Dashboard() {
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [redownloadingId, setRedownloadingId] = useState<string | null>(null);
+  const [plan, setPlan] = useState<Plan>("free");
+  const [usage, setUsage] = useState(0);
+  const [planBusy, setPlanBusy] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -65,10 +71,25 @@ function Dashboard() {
       }
       setEmail(data.session.user.email ?? "");
       await load();
+      const [p, u] = await Promise.all([getCurrentPlan(), getTodayUsage()]);
+      setPlan(p);
+      setUsage(u);
       setReady(true);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const switchPlan = async (next: Plan) => {
+    setPlanBusy(true);
+    const { error } = await supabase.auth.updateUser({ data: { plan: next } });
+    setPlanBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setPlan(next);
+    toast.success(`You're now on the ${next} plan`);
+  };
 
   const load = async () => {
     const { data, error } = await supabase
@@ -216,6 +237,10 @@ function Dashboard() {
             </Button>
           </div>
 
+          {/* Plan card */}
+          <PlanCard plan={plan} usage={usage} onSwitch={switchPlan} busy={planBusy} />
+
+
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
             <StatCard icon={BarChart3} label="Total" value={stats.total} />
@@ -359,4 +384,101 @@ function StatusBadge({ status }: { status: string }) {
     queued: "text-muted-foreground",
   };
   return <span className={map[status] ?? "text-muted-foreground"}>{status}</span>;
+}
+
+function PlanCard({
+  plan,
+  usage,
+  onSwitch,
+  busy,
+}: {
+  plan: Plan;
+  usage: number;
+  onSwitch: (p: Plan) => void;
+  busy: boolean;
+}) {
+  const limits = PLAN_LIMITS[plan];
+  const cap = limits.dailyFetches;
+  const remaining = cap === Infinity ? Infinity : Math.max(0, cap - usage);
+  const pct = cap === Infinity ? 100 : Math.min(100, (usage / cap) * 100);
+
+  return (
+    <div className="glass rounded-2xl p-5 mb-8">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-brand">
+            {plan === "free" ? (
+              <Sparkles className="h-4 w-4 text-primary-foreground" />
+            ) : (
+              <Crown className="h-4 w-4 text-primary-foreground" />
+            )}
+          </div>
+          <div>
+            <div className="text-sm text-muted-foreground">Current plan</div>
+            <div className="font-display text-lg font-semibold capitalize">{plan}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {plan !== "free" && (
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => onSwitch("free")}>
+              Downgrade
+            </Button>
+          )}
+          {plan !== "pro" && (
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() => onSwitch("pro")}
+              className="bg-gradient-brand text-primary-foreground hover:opacity-90"
+            >
+              {plan === "team" ? "Switch to Pro" : "Upgrade to Pro"}
+            </Button>
+          )}
+          {plan !== "team" && (
+            <Button variant="outline" size="sm" disabled={busy} onClick={() => onSwitch("team")}>
+              Switch to Team
+            </Button>
+          )}
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/pricing">Compare plans →</Link>
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+          <span>Daily fetches</span>
+          <span>
+            {usage} / {cap === Infinity ? "Unlimited" : cap}
+          </span>
+        </div>
+        <div className="h-1.5 w-full rounded-full bg-muted/40 overflow-hidden">
+          <div
+            className="h-full bg-gradient-brand transition-all"
+            style={{ width: `${cap === Infinity ? 12 : pct}%` }}
+          />
+        </div>
+        {remaining === 0 && (
+          <p className="text-xs text-destructive mt-2">
+            Daily limit reached. Upgrade to keep fetching today.
+          </p>
+        )}
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
+        <div className="rounded-lg bg-muted/30 px-3 py-2">
+          Max quality · <span className="text-foreground">{limits.maxQuality === "max" ? "Max" : limits.maxQuality + "p"}</span>
+        </div>
+        <div className="rounded-lg bg-muted/30 px-3 py-2">
+          Audio · <span className="text-foreground uppercase">{limits.audioFormats.join(", ")}</span>
+        </div>
+        <div className="rounded-lg bg-muted/30 px-3 py-2">
+          Batch · <span className="text-foreground">{limits.batch ? "Yes" : "No"}</span>
+        </div>
+        <div className="rounded-lg bg-muted/30 px-3 py-2">
+          Priority queue · <span className="text-foreground">{limits.priorityQueue ? "Yes" : "No"}</span>
+        </div>
+      </div>
+    </div>
+  );
 }
