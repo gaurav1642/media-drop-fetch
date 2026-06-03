@@ -237,6 +237,10 @@ function Dashboard() {
             </Button>
           </div>
 
+          {/* Plan card */}
+          <PlanCard plan={plan} usage={usage} onSwitch={switchPlan} busy={planBusy} />
+
+
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
             <StatCard icon={BarChart3} label="Total" value={stats.total} />
