@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,7 @@ import { SiteLayout } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { PLAN_LIMITS, type Plan, getCurrentPlan, getTodayUsage } from "@/lib/plan";
 import {
   Download,
   Loader2,
@@ -19,6 +20,8 @@ import {
   Clock,
   BarChart3,
   RefreshCw,
+  Sparkles,
+  Crown,
 } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
