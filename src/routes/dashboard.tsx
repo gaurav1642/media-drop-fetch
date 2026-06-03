@@ -59,6 +59,9 @@ function Dashboard() {
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [redownloadingId, setRedownloadingId] = useState<string | null>(null);
+  const [plan, setPlan] = useState<Plan>("free");
+  const [usage, setUsage] = useState(0);
+  const [planBusy, setPlanBusy] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -68,10 +71,25 @@ function Dashboard() {
       }
       setEmail(data.session.user.email ?? "");
       await load();
+      const [p, u] = await Promise.all([getCurrentPlan(), getTodayUsage()]);
+      setPlan(p);
+      setUsage(u);
       setReady(true);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const switchPlan = async (next: Plan) => {
+    setPlanBusy(true);
+    const { error } = await supabase.auth.updateUser({ data: { plan: next } });
+    setPlanBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setPlan(next);
+    toast.success(`You're now on the ${next} plan`);
+  };
 
   const load = async () => {
     const { data, error } = await supabase
