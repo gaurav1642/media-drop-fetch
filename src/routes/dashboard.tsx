@@ -385,3 +385,100 @@ function StatusBadge({ status }: { status: string }) {
   };
   return <span className={map[status] ?? "text-muted-foreground"}>{status}</span>;
 }
+
+function PlanCard({
+  plan,
+  usage,
+  onSwitch,
+  busy,
+}: {
+  plan: Plan;
+  usage: number;
+  onSwitch: (p: Plan) => void;
+  busy: boolean;
+}) {
+  const limits = PLAN_LIMITS[plan];
+  const cap = limits.dailyFetches;
+  const remaining = cap === Infinity ? Infinity : Math.max(0, cap - usage);
+  const pct = cap === Infinity ? 100 : Math.min(100, (usage / cap) * 100);
+
+  return (
+    <div className="glass rounded-2xl p-5 mb-8">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-brand">
+            {plan === "free" ? (
+              <Sparkles className="h-4 w-4 text-primary-foreground" />
+            ) : (
+              <Crown className="h-4 w-4 text-primary-foreground" />
+            )}
+          </div>
+          <div>
+            <div className="text-sm text-muted-foreground">Current plan</div>
+            <div className="font-display text-lg font-semibold capitalize">{plan}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {plan !== "free" && (
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => onSwitch("free")}>
+              Downgrade
+            </Button>
+          )}
+          {plan !== "pro" && (
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() => onSwitch("pro")}
+              className="bg-gradient-brand text-primary-foreground hover:opacity-90"
+            >
+              {plan === "team" ? "Switch to Pro" : "Upgrade to Pro"}
+            </Button>
+          )}
+          {plan !== "team" && (
+            <Button variant="outline" size="sm" disabled={busy} onClick={() => onSwitch("team")}>
+              Switch to Team
+            </Button>
+          )}
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/pricing">Compare plans →</Link>
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+          <span>Daily fetches</span>
+          <span>
+            {usage} / {cap === Infinity ? "Unlimited" : cap}
+          </span>
+        </div>
+        <div className="h-1.5 w-full rounded-full bg-muted/40 overflow-hidden">
+          <div
+            className="h-full bg-gradient-brand transition-all"
+            style={{ width: `${cap === Infinity ? 12 : pct}%` }}
+          />
+        </div>
+        {remaining === 0 && (
+          <p className="text-xs text-destructive mt-2">
+            Daily limit reached. Upgrade to keep fetching today.
+          </p>
+        )}
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
+        <div className="rounded-lg bg-muted/30 px-3 py-2">
+          Max quality · <span className="text-foreground">{limits.maxQuality === "max" ? "Max" : limits.maxQuality + "p"}</span>
+        </div>
+        <div className="rounded-lg bg-muted/30 px-3 py-2">
+          Audio · <span className="text-foreground uppercase">{limits.audioFormats.join(", ")}</span>
+        </div>
+        <div className="rounded-lg bg-muted/30 px-3 py-2">
+          Batch · <span className="text-foreground">{limits.batch ? "Yes" : "No"}</span>
+        </div>
+        <div className="rounded-lg bg-muted/30 px-3 py-2">
+          Priority queue · <span className="text-foreground">{limits.priorityQueue ? "Yes" : "No"}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
