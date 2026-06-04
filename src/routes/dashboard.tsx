@@ -352,7 +352,7 @@ function Dashboard() {
                       <RefreshCw className="h-4 w-4" />
                     )}
                   </button>
-                  <a href={r.source_url} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground p-2" title="Open source">
+                  <a href={safeHref(r.source_url) ?? "#"} target="_blank" rel="noreferrer noopener" className="text-muted-foreground hover:text-foreground p-2" title="Open source">
                     <ExternalLink className="h-4 w-4" />
                   </a>
                   <button onClick={() => remove(r.id)} className="text-muted-foreground hover:text-destructive p-2" aria-label="Delete">
