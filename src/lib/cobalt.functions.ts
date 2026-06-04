@@ -114,12 +114,18 @@ export const fetchMedia = createServerFn({ method: "POST" })
   .inputValidator((input) => InputSchema.parse(input))
   .handler(async ({ data }) => {
     const service = detectService(data.url);
-    const body = {
+    const body: Record<string, unknown> = {
       url: data.url,
       downloadMode: data.mode,
       videoQuality: data.quality,
       audioFormat: data.audioFormat,
       filenameStyle: "pretty",
+      // Force cobalt to tunnel (proxy + mux) instead of returning a raw
+      // adaptive stream URL — adaptive streams (esp. YouTube DASH) are
+      // video-only and play back without sound.
+      alwaysProxy: true,
+      youtubeVideoContainer: "mp4",
+      audioBitrate: "128",
     };
 
     let lastErrorCode: string | null = null;
