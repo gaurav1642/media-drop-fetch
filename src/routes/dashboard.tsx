@@ -79,17 +79,14 @@ function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const switchPlan = async (next: Plan) => {
-    setPlanBusy(true);
-    const { error } = await supabase.auth.updateUser({ data: { plan: next } });
-    setPlanBusy(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    setPlan(next);
-    toast.success(`You're now on the ${next} plan`);
+  // Plan changes must originate from trusted server code after payment confirmation.
+  // We expose a no-op here so existing UI handlers still type-check; the buttons
+  // are wired to send users to the pricing page instead.
+  const switchPlan = async (_next: Plan) => {
+    toast.message("Plan changes go through billing. Choose a plan on the pricing page.");
+    navigate({ to: "/pricing" });
   };
+
 
   const load = async () => {
     const { data, error } = await supabase
