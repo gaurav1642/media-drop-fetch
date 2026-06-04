@@ -38,6 +38,23 @@ type DownloadRow = {
   created_at: string;
 };
 
+function normalizeHttpUrl(input: string): string | null {
+  const candidate = /^https?:\/\//i.test(input) ? input : `https://${input}`;
+  try {
+    const u = new URL(candidate);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    if (!u.hostname || !u.hostname.includes(".")) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+function safeHref(input: string | null | undefined): string | undefined {
+  if (!input) return undefined;
+  return normalizeHttpUrl(input) ?? undefined;
+}
+
 function detectPlatform(url: string): string | null {
   const u = url.toLowerCase();
   if (u.includes("youtube") || u.includes("youtu.be")) return "YouTube";
