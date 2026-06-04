@@ -117,18 +117,51 @@ async function callInstance(
 }
 
 export const fetchMedia = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input) => InputSchema.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    // Resolve plan server-side (do NOT trust the client)
+    const { data: planRow } = await supabase
+      .from("user_plans")
+      .select("plan")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const rawPlan = (planRow?.plan as Plan | undefined) ?? "free";
+    const plan: Plan = rawPlan === "pro" || rawPlan === "team" ? rawPlan : "free";
+    const limits = PLAN_LIMITS[plan];
+
+    // Enforce daily fetch cap server-side
+    if (limits.dailyFetches !== Infinity) {
+      const since = new Date();
+      since.setHours(0, 0, 0, 0);
+      const { count } = await supabase
+        .from("downloads")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .gte("created_at", since.toISOString());
+      if ((count ?? 0) >= limits.dailyFetches) {
+        return {
+          ok: false as const,
+          error: `Daily limit reached on the ${plan} plan. Upgrade to keep fetching today.`,
+        };
+      }
+    }
+
+    // Clamp quality / audio format to the user's plan — never trust client values
+    const safeQuality = clampQuality(plan, data.quality);
+    const safeAudio = audioAllowed(plan, data.audioFormat)
+      ? data.audioFormat
+      : limits.audioFormats[0];
+
     const service = detectService(data.url);
     const body: Record<string, unknown> = {
       url: data.url,
       downloadMode: data.mode,
-      videoQuality: data.quality,
-      audioFormat: data.audioFormat,
+      videoQuality: safeQuality,
+      audioFormat: safeAudio,
       filenameStyle: "pretty",
-      // Force cobalt to tunnel (proxy + mux) instead of returning a raw
-      // adaptive stream URL — adaptive streams (esp. YouTube DASH) are
-      // video-only and play back without sound.
       alwaysProxy: true,
       youtubeVideoContainer: "mp4",
       audioBitrate: "128",
