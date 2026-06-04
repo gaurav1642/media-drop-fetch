@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { PLAN_LIMITS, clampQuality, audioAllowed, type Plan } from "@/lib/plan";
 
 const InputSchema = z.object({
   url: z
@@ -12,12 +14,16 @@ const InputSchema = z.object({
         try {
           const withProto = /^https?:\/\//i.test(s) ? s : `https://${s}`;
           const u = new URL(withProto);
-          return !!u.hostname && u.hostname.includes(".");
+          return (
+            (u.protocol === "http:" || u.protocol === "https:") &&
+            !!u.hostname &&
+            u.hostname.includes(".")
+          );
         } catch {
           return false;
         }
       },
-      { message: "Please enter a valid link (e.g. https://...)" },
+      { message: "Please enter a valid http(s) link." },
     )
     .transform((s) => (/^https?:\/\//i.test(s) ? s : `https://${s}`)),
   mode: z.enum(["auto", "audio", "mute"]).default("auto"),
