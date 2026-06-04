@@ -100,8 +100,14 @@ function Dashboard() {
 
   const addLink = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim()) return;
-    const platform = detectPlatform(url);
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    const safeUrl = normalizeHttpUrl(trimmed);
+    if (!safeUrl) {
+      toast.error("Please enter a valid http(s) URL.");
+      return;
+    }
+    const platform = detectPlatform(safeUrl);
     if (!platform) {
       toast.error("Unrecognized platform");
       return;
@@ -111,7 +117,7 @@ function Dashboard() {
     if (!user.user) return;
     const { error } = await supabase.from("downloads").insert({
       user_id: user.user.id,
-      source_url: url,
+      source_url: safeUrl,
       platform,
       status: "queued",
     });
@@ -120,6 +126,7 @@ function Dashboard() {
       toast.error(error.message);
       return;
     }
+
     setUrl("");
     toast.success("Saved to history");
     load();
