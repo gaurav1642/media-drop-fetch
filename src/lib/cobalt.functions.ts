@@ -2,7 +2,24 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 const InputSchema = z.object({
-  url: z.string().url().min(1).max(2000),
+  url: z
+    .string()
+    .min(1)
+    .max(2000)
+    .transform((s) => s.trim())
+    .refine(
+      (s) => {
+        try {
+          const withProto = /^https?:\/\//i.test(s) ? s : `https://${s}`;
+          const u = new URL(withProto);
+          return !!u.hostname && u.hostname.includes(".");
+        } catch {
+          return false;
+        }
+      },
+      { message: "Please enter a valid link (e.g. https://...)" },
+    )
+    .transform((s) => (/^https?:\/\//i.test(s) ? s : `https://${s}`)),
   mode: z.enum(["auto", "audio", "mute"]).default("auto"),
   quality: z.enum(["144", "240", "360", "480", "720", "1080", "1440", "2160", "max"]).default("1080"),
   audioFormat: z.enum(["mp3", "ogg", "wav", "opus", "best"]).default("mp3"),
