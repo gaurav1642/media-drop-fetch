@@ -75,9 +75,15 @@ export function audioAllowed(plan: Plan, fmt: string): boolean {
 }
 
 export async function getCurrentPlan(): Promise<Plan> {
-  const { data } = await supabase.auth.getSession();
-  const meta = data.session?.user?.user_metadata as { plan?: Plan } | undefined;
-  return meta?.plan ?? "free";
+  const { data: sess } = await supabase.auth.getSession();
+  if (!sess.session) return "free";
+  const { data } = await supabase
+    .from("user_plans")
+    .select("plan")
+    .eq("user_id", sess.session.user.id)
+    .maybeSingle();
+  const p = (data?.plan as Plan | undefined) ?? "free";
+  return p === "pro" || p === "team" ? p : "free";
 }
 
 const ANON_KEY = "mediadrop_anon_usage";

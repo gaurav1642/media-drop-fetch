@@ -38,6 +38,23 @@ type DownloadRow = {
   created_at: string;
 };
 
+function normalizeHttpUrl(input: string): string | null {
+  const candidate = /^https?:\/\//i.test(input) ? input : `https://${input}`;
+  try {
+    const u = new URL(candidate);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    if (!u.hostname || !u.hostname.includes(".")) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+function safeHref(input: string | null | undefined): string | undefined {
+  if (!input) return undefined;
+  return normalizeHttpUrl(input) ?? undefined;
+}
+
 function detectPlatform(url: string): string | null {
   const u = url.toLowerCase();
   if (u.includes("youtube") || u.includes("youtu.be")) return "YouTube";
@@ -79,17 +96,14 @@ function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const switchPlan = async (next: Plan) => {
-    setPlanBusy(true);
-    const { error } = await supabase.auth.updateUser({ data: { plan: next } });
-    setPlanBusy(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    setPlan(next);
-    toast.success(`You're now on the ${next} plan`);
+  // Plan changes must originate from trusted server code after payment confirmation.
+  // We expose a no-op here so existing UI handlers still type-check; the buttons
+  // are wired to send users to the pricing page instead.
+  const switchPlan = async (_next: Plan) => {
+    toast.message("Plan changes go through billing. Choose a plan on the pricing page.");
+    navigate({ to: "/pricing" });
   };
+
 
   const load = async () => {
     const { data, error } = await supabase
@@ -103,8 +117,14 @@ function Dashboard() {
 
   const addLink = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim()) return;
-    const platform = detectPlatform(url);
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    const safeUrl = normalizeHttpUrl(trimmed);
+    if (!safeUrl) {
+      toast.error("Please enter a valid http(s) URL.");
+      return;
+    }
+    const platform = detectPlatform(safeUrl);
     if (!platform) {
       toast.error("Unrecognized platform");
       return;
@@ -114,7 +134,7 @@ function Dashboard() {
     if (!user.user) return;
     const { error } = await supabase.from("downloads").insert({
       user_id: user.user.id,
-      source_url: url,
+      source_url: safeUrl,
       platform,
       status: "queued",
     });
@@ -123,6 +143,7 @@ function Dashboard() {
       toast.error(error.message);
       return;
     }
+
     setUrl("");
     toast.success("Saved to history");
     load();
@@ -331,7 +352,7 @@ function Dashboard() {
                       <RefreshCw className="h-4 w-4" />
                     )}
                   </button>
-                  <a href={r.source_url} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground p-2" title="Open source">
+                  <a href={safeHref(r.source_url) ?? "#"} target="_blank" rel="noreferrer noopener" className="text-muted-foreground hover:text-foreground p-2" title="Open source">
                     <ExternalLink className="h-4 w-4" />
                   </a>
                   <button onClick={() => remove(r.id)} className="text-muted-foreground hover:text-destructive p-2" aria-label="Delete">

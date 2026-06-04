@@ -210,6 +210,14 @@ function Home() {
       return;
     }
 
+    // Server requires authentication to fetch media (prevents abuse / bypass)
+    if (!signedIn) {
+      toast.error("Please sign in to download media.");
+      return;
+    }
+
+
+
     // Enforce plan limits
     if (overLimit) {
       toast.error(
