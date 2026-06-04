@@ -208,7 +208,13 @@ function Home() {
     if (!platform) {
       toast.error("URL not recognized. Try YouTube, Instagram, TikTok, Facebook, X, or Vimeo.");
       return;
+
+    // Server requires authentication to fetch media (prevents abuse / bypass)
+    if (!signedIn) {
+      toast.error("Please sign in to download media.");
+      return;
     }
+
 
     // Enforce plan limits
     if (overLimit) {
