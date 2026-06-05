@@ -206,7 +206,11 @@ function Home() {
       return;
     }
     if (!platform) {
-      toast.error("URL not recognized. Try YouTube, Instagram, TikTok, Facebook, X, or Vimeo.");
+      toast.error("URL not recognized. Try Instagram, TikTok, Facebook, X, or Vimeo.");
+      return;
+    }
+    if (platform === "YouTube") {
+      toast.error("YouTube downloads aren't supported right now — public servers block them. Try Instagram, TikTok, Facebook, X, or Vimeo.");
       return;
     }
 
