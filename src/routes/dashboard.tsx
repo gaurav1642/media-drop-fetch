@@ -81,18 +81,34 @@ function Dashboard() {
   const [planBusy, setPlanBusy] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!data.session) {
-        navigate({ to: "/login" });
-        return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) {
+          navigate({ to: "/login" });
+          return;
+        }
+        if (cancelled) return;
+        setEmail(data.session.user.email ?? "");
+        const results = await Promise.allSettled([load(), getCurrentPlan(), getTodayUsage()]);
+        if (cancelled) return;
+        const p = results[1].status === "fulfilled" ? results[1].value : "free";
+        const u = results[2].status === "fulfilled" ? results[2].value : 0;
+        setPlan(p as Plan);
+        setUsage(u as number);
+        if (results[0].status === "rejected") console.error("[dashboard] load failed", results[0].reason);
+        if (results[1].status === "rejected") console.error("[dashboard] plan failed", results[1].reason);
+        if (results[2].status === "rejected") console.error("[dashboard] usage failed", results[2].reason);
+      } catch (err) {
+        console.error("[dashboard] init failed", err);
+      } finally {
+        if (!cancelled) setReady(true);
       }
-      setEmail(data.session.user.email ?? "");
-      await load();
-      const [p, u] = await Promise.all([getCurrentPlan(), getTodayUsage()]);
-      setPlan(p);
-      setUsage(u);
-      setReady(true);
-    });
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
