@@ -57,7 +57,7 @@ export const Route = createFileRoute("/")({
   }),
 });
 
-const platforms = ["YouTube", "Instagram", "TikTok", "Facebook", "Twitter/X", "Vimeo"];
+const platforms = ["Instagram", "TikTok", "Facebook", "Twitter/X", "Vimeo"];
 
 function detectPlatform(url: string): string | null {
   const u = url.toLowerCase();
@@ -206,7 +206,11 @@ function Home() {
       return;
     }
     if (!platform) {
-      toast.error("URL not recognized. Try YouTube, Instagram, TikTok, Facebook, X, or Vimeo.");
+      toast.error("URL not recognized. Try Instagram, TikTok, Facebook, X, or Vimeo.");
+      return;
+    }
+    if (platform === "YouTube") {
+      toast.error("YouTube downloads aren't supported right now — public servers block them. Try Instagram, TikTok, Facebook, X, or Vimeo.");
       return;
     }
 
@@ -286,7 +290,7 @@ function Home() {
                 <Input
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="Paste a YouTube, Instagram, TikTok, X, or Vimeo URL…"
+                  placeholder="Paste an Instagram, TikTok, Facebook, X, or Vimeo URL…"
                   className="bg-transparent border-0 h-12 text-base focus-visible:ring-0 px-4 pr-12 w-full"
                   disabled={busy}
                 />
@@ -471,7 +475,7 @@ function Home() {
               { icon: ImageIcon, title: "Thumbnail", desc: "Grab the cover image in original resolution." },
               { icon: Zap, title: "Fast queue", desc: "Background processing so you can paste the next link immediately." },
               { icon: ShieldCheck, title: "Private by default", desc: "Files are auto-deleted shortly after they're ready." },
-              { icon: Globe, title: "6+ platforms", desc: "YouTube, Instagram, TikTok, Facebook, X, Vimeo — and growing." },
+              { icon: Globe, title: "5+ platforms", desc: "Instagram, TikTok, Facebook, X, Vimeo — and growing." },
             ].map((f) => (
               <div key={f.title} className="glass rounded-2xl p-6 hover:border-primary/40 transition-colors group">
                 <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-brand mb-4 group-hover:shadow-glow transition-shadow">
