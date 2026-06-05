@@ -108,6 +108,10 @@ function Home() {
   const [signedIn, setSignedIn] = useState(false);
   const platform = detectPlatform(url);
   const fetchMediaFn = useServerFn(fetchMedia);
+  const fetchMetadataFn = useServerFn(fetchMetadata);
+  const [metadata, setMetadata] = useState<MediaMetadata | null>(null);
+  const [metaBusy, setMetaBusy] = useState(false);
+  const [thumbBusy, setThumbBusy] = useState(false);
 
   const limits = PLAN_LIMITS[plan];
   const remaining = limits.dailyFetches === Infinity ? Infinity : Math.max(0, limits.dailyFetches - usage);
