@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchMedia } from "@/lib/cobalt.functions";
+import { fetchMetadata, type MediaMetadata } from "@/lib/metadata.functions";
 import {
   PLAN_LIMITS,
   type Plan,
@@ -40,6 +41,7 @@ import {
   Copy,
   Check,
   Lock,
+  FileJson,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
