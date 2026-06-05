@@ -511,6 +511,88 @@ function Home() {
                 </Button>
               </div>
             )}
+
+            {/* Thumbnail & metadata */}
+            <div className="mt-4 flex justify-center">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleFetchMetadata}
+                disabled={metaBusy || !url.trim()}
+                className="h-9 text-xs"
+              >
+                {metaBusy ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                {metaBusy ? "Reading…" : "Get thumbnail & info"}
+              </Button>
+            </div>
+
+            {metadata && (
+              <div className="mt-4 glass rounded-2xl p-5 text-left">
+                <div className="flex flex-col sm:flex-row gap-5">
+                  {metadata.thumbnail_url ? (
+                    <img
+                      src={metadata.thumbnail_url}
+                      alt={metadata.title ?? "Thumbnail"}
+                      loading="lazy"
+                      className="w-full sm:w-48 h-auto rounded-xl object-cover bg-muted/30"
+                    />
+                  ) : (
+                    <div className="w-full sm:w-48 h-28 rounded-xl bg-muted/30 grid place-items-center text-xs text-muted-foreground">
+                      No thumbnail
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    {metadata.title && (
+                      <p className="text-sm font-medium text-foreground line-clamp-2">{metadata.title}</p>
+                    )}
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      {metadata.author && <p>By {metadata.author}</p>}
+                      {metadata.provider && <p>Source: {metadata.provider}</p>}
+                      {metadata.width && metadata.height && (
+                        <p>Thumbnail: {metadata.width}×{metadata.height}</p>
+                      )}
+                      {metadata.upload_date && <p>Published: {new Date(metadata.upload_date).toLocaleDateString()}</p>}
+                    </div>
+                    {metadata.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-3 pt-1">
+                        {metadata.description}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2 pt-3">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleDownloadThumbnail}
+                        disabled={!metadata.thumbnail_url || thumbBusy}
+                        className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow h-9"
+                      >
+                        {thumbBusy ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        Download thumbnail
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDownloadMetadata}
+                        className="h-9"
+                      >
+                        <FileJson className="h-3.5 w-3.5 mr-1.5" />
+                        Download metadata
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </form>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
