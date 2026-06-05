@@ -16,7 +16,7 @@ export const Route = createFileRoute("/faq")({
 });
 
 const items = [
-  { q: "What platforms are supported?", a: "YouTube, Instagram, TikTok, Facebook, Twitter/X, and Vimeo. More on the way." },
+  { q: "What platforms are supported?", a: "Instagram, TikTok, Facebook, Twitter/X, and Vimeo. More on the way. YouTube is currently unavailable because public servers block it." },
   { q: "Is this legal?", a: "Downloading content is your responsibility. Only save media you own, created, or have explicit permission to download. Respect each platform's Terms of Service and copyright law." },
   { q: "Do you store the files?", a: "Files are processed on demand and auto-deleted shortly after they are ready. We never keep your media long-term." },
   { q: "Do I need an account?", a: "No, you can fetch without an account. Sign up if you want history, favorites, and Pro features." },
