@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchMedia } from "@/lib/cobalt.functions";
+import { fetchMetadata, type MediaMetadata } from "@/lib/metadata.functions";
 import {
   PLAN_LIMITS,
   type Plan,
@@ -40,6 +41,7 @@ import {
   Copy,
   Check,
   Lock,
+  FileJson,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -106,6 +108,10 @@ function Home() {
   const [signedIn, setSignedIn] = useState(false);
   const platform = detectPlatform(url);
   const fetchMediaFn = useServerFn(fetchMedia);
+  const fetchMetadataFn = useServerFn(fetchMetadata);
+  const [metadata, setMetadata] = useState<MediaMetadata | null>(null);
+  const [metaBusy, setMetaBusy] = useState(false);
+  const [thumbBusy, setThumbBusy] = useState(false);
 
   const limits = PLAN_LIMITS[plan];
   const remaining = limits.dailyFetches === Infinity ? Infinity : Math.max(0, limits.dailyFetches - usage);
@@ -197,6 +203,79 @@ function Home() {
       platform,
       status,
     });
+  };
+
+  const handleFetchMetadata = async () => {
+    if (!url.trim()) {
+      toast.error("Paste a URL first");
+      return;
+    }
+    if (!signedIn) {
+      toast.error("Please sign in to fetch metadata.");
+      return;
+    }
+    setMetaBusy(true);
+    setMetadata(null);
+    try {
+      const res = await fetchMetadataFn({ data: { url } });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      setMetadata(res.metadata);
+      toast.success("Metadata ready");
+    } catch (err) {
+      console.error(err);
+      toast.error("Couldn't fetch metadata. Try again.");
+    } finally {
+      setMetaBusy(false);
+    }
+  };
+
+  const handleDownloadThumbnail = async () => {
+    if (!metadata?.thumbnail_url) return;
+    setThumbBusy(true);
+    try {
+      const res = await fetch(metadata.thumbnail_url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const ext = (blob.type.split("/")[1] || "jpg").split(";")[0].replace("jpeg", "jpg");
+      const plat = (metadata.provider ?? platform ?? "media").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const filename = `mediadrop-${plat}-thumbnail-${Date.now()}.${ext}`;
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      toast.success("Thumbnail saved");
+    } catch (err) {
+      console.error(err);
+      toast.error("Couldn't save thumbnail — opening in a new tab.");
+      window.open(metadata.thumbnail_url, "_blank", "noopener,noreferrer");
+    } finally {
+      setThumbBusy(false);
+    }
+  };
+
+  const handleDownloadMetadata = () => {
+    if (!metadata) return;
+    const blob = new Blob([JSON.stringify(metadata, null, 2)], {
+      type: "application/json",
+    });
+    const plat = (metadata.provider ?? platform ?? "media").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const filename = `mediadrop-${plat}-metadata-${Date.now()}.json`;
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+    toast.success("Metadata downloaded");
   };
 
   const onFetch = async (e: React.FormEvent) => {
@@ -430,6 +509,88 @@ function Home() {
                   {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
                   {downloading ? "Saving…" : "Download"}
                 </Button>
+              </div>
+            )}
+
+            {/* Thumbnail & metadata */}
+            <div className="mt-4 flex justify-center">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleFetchMetadata}
+                disabled={metaBusy || !url.trim()}
+                className="h-9 text-xs"
+              >
+                {metaBusy ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                {metaBusy ? "Reading…" : "Get thumbnail & info"}
+              </Button>
+            </div>
+
+            {metadata && (
+              <div className="mt-4 glass rounded-2xl p-5 text-left">
+                <div className="flex flex-col sm:flex-row gap-5">
+                  {metadata.thumbnail_url ? (
+                    <img
+                      src={metadata.thumbnail_url}
+                      alt={metadata.title ?? "Thumbnail"}
+                      loading="lazy"
+                      className="w-full sm:w-48 h-auto rounded-xl object-cover bg-muted/30"
+                    />
+                  ) : (
+                    <div className="w-full sm:w-48 h-28 rounded-xl bg-muted/30 grid place-items-center text-xs text-muted-foreground">
+                      No thumbnail
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    {metadata.title && (
+                      <p className="text-sm font-medium text-foreground line-clamp-2">{metadata.title}</p>
+                    )}
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      {metadata.author && <p>By {metadata.author}</p>}
+                      {metadata.provider && <p>Source: {metadata.provider}</p>}
+                      {metadata.width && metadata.height && (
+                        <p>Thumbnail: {metadata.width}×{metadata.height}</p>
+                      )}
+                      {metadata.upload_date && <p>Published: {new Date(metadata.upload_date).toLocaleDateString()}</p>}
+                    </div>
+                    {metadata.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-3 pt-1">
+                        {metadata.description}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2 pt-3">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleDownloadThumbnail}
+                        disabled={!metadata.thumbnail_url || thumbBusy}
+                        className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow h-9"
+                      >
+                        {thumbBusy ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        Download thumbnail
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDownloadMetadata}
+                        className="h-9"
+                      >
+                        <FileJson className="h-3.5 w-3.5 mr-1.5" />
+                        Download metadata
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </form>
