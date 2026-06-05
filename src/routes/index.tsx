@@ -475,7 +475,7 @@ function Home() {
               { icon: ImageIcon, title: "Thumbnail", desc: "Grab the cover image in original resolution." },
               { icon: Zap, title: "Fast queue", desc: "Background processing so you can paste the next link immediately." },
               { icon: ShieldCheck, title: "Private by default", desc: "Files are auto-deleted shortly after they're ready." },
-              { icon: Globe, title: "6+ platforms", desc: "YouTube, Instagram, TikTok, Facebook, X, Vimeo — and growing." },
+              { icon: Globe, title: "5+ platforms", desc: "Instagram, TikTok, Facebook, X, Vimeo — and growing." },
             ].map((f) => (
               <div key={f.title} className="glass rounded-2xl p-6 hover:border-primary/40 transition-colors group">
                 <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-brand mb-4 group-hover:shadow-glow transition-shadow">
