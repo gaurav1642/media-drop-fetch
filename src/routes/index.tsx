@@ -205,6 +205,79 @@ function Home() {
     });
   };
 
+  const handleFetchMetadata = async () => {
+    if (!url.trim()) {
+      toast.error("Paste a URL first");
+      return;
+    }
+    if (!signedIn) {
+      toast.error("Please sign in to fetch metadata.");
+      return;
+    }
+    setMetaBusy(true);
+    setMetadata(null);
+    try {
+      const res = await fetchMetadataFn({ data: { url } });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      setMetadata(res.metadata);
+      toast.success("Metadata ready");
+    } catch (err) {
+      console.error(err);
+      toast.error("Couldn't fetch metadata. Try again.");
+    } finally {
+      setMetaBusy(false);
+    }
+  };
+
+  const handleDownloadThumbnail = async () => {
+    if (!metadata?.thumbnail_url) return;
+    setThumbBusy(true);
+    try {
+      const res = await fetch(metadata.thumbnail_url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const ext = (blob.type.split("/")[1] || "jpg").split(";")[0].replace("jpeg", "jpg");
+      const plat = (metadata.provider ?? platform ?? "media").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const filename = `mediadrop-${plat}-thumbnail-${Date.now()}.${ext}`;
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      toast.success("Thumbnail saved");
+    } catch (err) {
+      console.error(err);
+      toast.error("Couldn't save thumbnail — opening in a new tab.");
+      window.open(metadata.thumbnail_url, "_blank", "noopener,noreferrer");
+    } finally {
+      setThumbBusy(false);
+    }
+  };
+
+  const handleDownloadMetadata = () => {
+    if (!metadata) return;
+    const blob = new Blob([JSON.stringify(metadata, null, 2)], {
+      type: "application/json",
+    });
+    const plat = (metadata.provider ?? platform ?? "media").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const filename = `mediadrop-${plat}-metadata-${Date.now()}.json`;
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+    toast.success("Metadata downloaded");
+  };
+
   const onFetch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) {
