@@ -57,7 +57,7 @@ export const Route = createFileRoute("/")({
   }),
 });
 
-const platforms = ["YouTube", "Instagram", "TikTok", "Facebook", "Twitter/X", "Vimeo"];
+const platforms = ["Instagram", "TikTok", "Facebook", "Twitter/X", "Vimeo"];
 
 function detectPlatform(url: string): string | null {
   const u = url.toLowerCase();
