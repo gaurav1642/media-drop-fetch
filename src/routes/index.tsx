@@ -290,7 +290,7 @@ function Home() {
                 <Input
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="Paste a YouTube, Instagram, TikTok, X, or Vimeo URL…"
+                  placeholder="Paste an Instagram, TikTok, Facebook, X, or Vimeo URL…"
                   className="bg-transparent border-0 h-12 text-base focus-visible:ring-0 px-4 pr-12 w-full"
                   disabled={busy}
                 />
