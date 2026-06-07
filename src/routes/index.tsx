@@ -211,7 +211,8 @@ function Home() {
       toast.error("Paste a URL first");
       return;
     }
-    if (!signedIn) {
+    const { data: sess } = await supabase.auth.getSession();
+    if (!sess.session) {
       toast.error("Please sign in to fetch metadata.");
       return;
     }
