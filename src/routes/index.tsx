@@ -109,6 +109,7 @@ function Home() {
   const platform = detectPlatform(url);
   const fetchMediaFn = useServerFn(fetchMedia);
   const fetchMetadataFn = useServerFn(fetchMetadata);
+  const fetchThumbnailFn = useServerFn(fetchThumbnail);
   const [metadata, setMetadata] = useState<MediaMetadata | null>(null);
   const [metaBusy, setMetaBusy] = useState(false);
   const [thumbBusy, setThumbBusy] = useState(false);
