@@ -237,10 +237,17 @@ function Home() {
     if (!metadata?.thumbnail_url) return;
     setThumbBusy(true);
     try {
-      const res = await fetch(metadata.thumbnail_url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const ext = (blob.type.split("/")[1] || "jpg").split(";")[0].replace("jpeg", "jpg");
+      const res = await fetchThumbnailFn({ data: { url: metadata.thumbnail_url } });
+      if (!res.ok) {
+        toast.error(res.error);
+        window.open(metadata.thumbnail_url, "_blank", "noopener,noreferrer");
+        return;
+      }
+      const bin = atob(res.base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: res.contentType });
+      const ext = (res.contentType.split("/")[1] || "jpg").split(";")[0].replace("jpeg", "jpg");
       const plat = (metadata.provider ?? platform ?? "media").toLowerCase().replace(/[^a-z0-9]/g, "");
       const filename = `mediadrop-${plat}-thumbnail-${Date.now()}.${ext}`;
       const blobUrl = URL.createObjectURL(blob);
@@ -255,7 +262,9 @@ function Home() {
     } catch (err) {
       console.error(err);
       toast.error("Couldn't save thumbnail — opening in a new tab.");
-      window.open(metadata.thumbnail_url, "_blank", "noopener,noreferrer");
+      if (metadata.thumbnail_url) {
+        window.open(metadata.thumbnail_url, "_blank", "noopener,noreferrer");
+      }
     } finally {
       setThumbBusy(false);
     }
