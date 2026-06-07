@@ -191,3 +191,39 @@ export const fetchMetadata = createServerFn({ method: "POST" })
 
     return { ok: true as const, metadata: merged };
   });
+
+const ThumbInput = z.object({
+  url: z.string().url().max(4000),
+});
+
+export const fetchThumbnail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => ThumbInput.parse(input))
+  .handler(async ({ data }) => {
+    try {
+      const r = await fetch(data.url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (compatible; MediaDropBot/1.0; +https://lovable.dev)",
+          Accept: "image/*,*/*;q=0.8",
+        },
+        redirect: "follow",
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!r.ok) {
+        return { ok: false as const, error: `Upstream returned ${r.status}` };
+      }
+      const contentType = r.headers.get("content-type") ?? "image/jpeg";
+      if (!contentType.startsWith("image/")) {
+        return { ok: false as const, error: "URL did not return an image." };
+      }
+      const buf = new Uint8Array(await r.arrayBuffer());
+      let bin = "";
+      for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+      const base64 = btoa(bin);
+      return { ok: true as const, contentType, base64 };
+    } catch (err) {
+      console.error("[fetchThumbnail]", err);
+      return { ok: false as const, error: "Couldn't download thumbnail." };
+    }
+  });
