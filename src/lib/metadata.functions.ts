@@ -114,7 +114,7 @@ async function tryOpenGraph(url: string): Promise<Partial<MediaMetadata> | null>
         "i",
       );
       const m = html.match(re);
-      return m ? m[1].trim() : null;
+      return m ? decodeEntities(m[1].trim()) : null;
     };
     const metaAlt = (prop: string): string | null => {
       const re = new RegExp(
