@@ -38,10 +38,26 @@ export type MediaMetadata = {
   fetched_at: string;
 };
 
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => {
+      try { return String.fromCodePoint(parseInt(h, 16)); } catch { return _; }
+    })
+    .replace(/&#(\d+);/g, (_, d) => {
+      try { return String.fromCodePoint(parseInt(d, 10)); } catch { return _; }
+    })
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&");
+}
+
 function pickString(obj: Record<string, unknown>, ...keys: string[]): string | null {
   for (const k of keys) {
     const v = obj[k];
-    if (typeof v === "string" && v.trim()) return v;
+    if (typeof v === "string" && v.trim()) return decodeEntities(v);
   }
   return null;
 }
@@ -98,7 +114,7 @@ async function tryOpenGraph(url: string): Promise<Partial<MediaMetadata> | null>
         "i",
       );
       const m = html.match(re);
-      return m ? m[1].trim() : null;
+      return m ? decodeEntities(m[1].trim()) : null;
     };
     const metaAlt = (prop: string): string | null => {
       const re = new RegExp(
@@ -106,7 +122,7 @@ async function tryOpenGraph(url: string): Promise<Partial<MediaMetadata> | null>
         "i",
       );
       const m = html.match(re);
-      return m ? m[1].trim() : null;
+      return m ? decodeEntities(m[1].trim()) : null;
     };
     const pick = (...names: string[]): string | null => {
       for (const n of names) {
@@ -174,4 +190,40 @@ export const fetchMetadata = createServerFn({ method: "POST" })
     }
 
     return { ok: true as const, metadata: merged };
+  });
+
+const ThumbInput = z.object({
+  url: z.string().url().max(4000),
+});
+
+export const fetchThumbnail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => ThumbInput.parse(input))
+  .handler(async ({ data }) => {
+    try {
+      const r = await fetch(data.url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (compatible; MediaDropBot/1.0; +https://lovable.dev)",
+          Accept: "image/*,*/*;q=0.8",
+        },
+        redirect: "follow",
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!r.ok) {
+        return { ok: false as const, error: `Upstream returned ${r.status}` };
+      }
+      const contentType = r.headers.get("content-type") ?? "image/jpeg";
+      if (!contentType.startsWith("image/")) {
+        return { ok: false as const, error: "URL did not return an image." };
+      }
+      const buf = new Uint8Array(await r.arrayBuffer());
+      let bin = "";
+      for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+      const base64 = btoa(bin);
+      return { ok: true as const, contentType, base64 };
+    } catch (err) {
+      console.error("[fetchThumbnail]", err);
+      return { ok: false as const, error: "Couldn't download thumbnail." };
+    }
   });
