@@ -12,13 +12,21 @@ const nav = [
 ] as const;
 
 export function SiteHeader() {
-  const [authed, setAuthed] = useState(false);
+  const [authed, setAuthed] = useState<boolean | null>(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setAuthed(!!data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setAuthed(!!s));
-    return () => sub.subscription.unsubscribe();
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (mounted) setAuthed(!!data.session);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      if (mounted) setAuthed(!!s);
+    });
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   return (
@@ -45,8 +53,10 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="hidden md:flex items-center gap-2">
-          {authed ? (
+        <div className="hidden md:flex items-center gap-2 min-h-10">
+          {authed === null ? (
+            <div className="h-10 w-40" aria-hidden />
+          ) : authed ? (
             <Button asChild variant="default" className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow">
               <Link to="/dashboard">Dashboard</Link>
             </Button>
