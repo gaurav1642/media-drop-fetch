@@ -305,7 +305,9 @@ function Home() {
     }
 
     // Server requires authentication to fetch media (prevents abuse / bypass)
-    if (!signedIn) {
+    const { data: sess } = await supabase.auth.getSession();
+    const isSignedIn = !!sess.session;
+    if (!isSignedIn) {
       toast.error("Please sign in to download media.");
       return;
     }
