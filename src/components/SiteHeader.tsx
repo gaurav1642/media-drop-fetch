@@ -53,8 +53,10 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="hidden md:flex items-center gap-2">
-          {authed ? (
+        <div className="hidden md:flex items-center gap-2 min-h-10">
+          {authed === null ? (
+            <div className="h-10 w-40" aria-hidden />
+          ) : authed ? (
             <Button asChild variant="default" className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow">
               <Link to="/dashboard">Dashboard</Link>
             </Button>
