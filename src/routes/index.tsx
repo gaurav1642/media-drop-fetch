@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
+  ssr: false,
   component: Home,
   head: () => ({
     meta: [
