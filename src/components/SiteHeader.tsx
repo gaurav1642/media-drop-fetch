@@ -20,7 +20,8 @@ export function SiteHeader() {
     supabase.auth.getSession().then(({ data }) => {
       if (mounted) setAuthed(!!data.session);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event !== "INITIAL_SESSION" && event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED" && event !== "TOKEN_REFRESHED") return;
       if (mounted) setAuthed(!!s);
     });
     return () => {
