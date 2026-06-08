@@ -105,6 +105,7 @@ function Home() {
   const [result, setResult] = useState<Result | null>(null);
   const [plan, setPlan] = useState<Plan>("free");
   const [usage, setUsage] = useState(0);
+  const [authReady, setAuthReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const platform = detectPlatform(url);
   const fetchMediaFn = useServerFn(fetchMedia);
@@ -119,23 +120,46 @@ function Home() {
   const overLimit = remaining === 0;
 
   const refreshUsage = async () => {
-    const [p, u, sess] = await Promise.all([
-      getCurrentPlan(),
-      getTodayUsage(),
-      supabase.auth.getSession(),
-    ]);
+    const { data: sess } = await supabase.auth.getSession();
+    const isSignedIn = !!sess.session;
+    const [p, u] = await Promise.all([getCurrentPlan(), getTodayUsage()]);
     setPlan(p);
     setUsage(u);
-    setSignedIn(!!sess.data.session);
+    setSignedIn(isSignedIn);
+    setAuthReady(true);
     // Clamp current quality to plan if needed
     setQuality((q) => clampQuality(p, q) as Quality);
   };
 
   useEffect(() => {
-    refreshUsage();
-    const { data: sub } = supabase.auth.onAuthStateChange(() => refreshUsage());
-    return () => sub.subscription.unsubscribe();
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        await refreshUsage();
+      } finally {
+        if (!cancelled) setAuthReady(true);
+      }
+    };
+    refresh();
+    const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
   }, []);
+
+  const getCurrentSession = async () => {
+    if (!authReady) {
+      await refreshUsage();
+    }
+    const { data } = await supabase.auth.getSession();
+    if (data.session) {
+      setSignedIn(true);
+      return data.session;
+    }
+    setSignedIn(false);
+    return null;
+  };
 
   const buildFilename = (r: Result) => {
     if (r.filename) return r.filename;
@@ -211,8 +235,8 @@ function Home() {
       toast.error("Paste a URL first");
       return;
     }
-    const { data: sess } = await supabase.auth.getSession();
-    if (!sess.session) {
+    const session = await getCurrentSession();
+    if (!session) {
       toast.error("Please sign in to fetch metadata.");
       return;
     }
@@ -305,8 +329,8 @@ function Home() {
     }
 
     // Server requires authentication to fetch media (prevents abuse / bypass)
-    const { data: sess } = await supabase.auth.getSession();
-    const isSignedIn = !!sess.session;
+    const session = await getCurrentSession();
+    const isSignedIn = !!session;
     if (!isSignedIn) {
       toast.error("Please sign in to download media.");
       return;
@@ -399,11 +423,11 @@ function Home() {
               <Button
                 type="submit"
                 size="lg"
-                disabled={busy || overLimit}
+                  disabled={busy || !authReady || overLimit}
                 className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow h-12 px-6"
               >
-                {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-                {busy ? "Fetching…" : "Fetch media"}
+                {busy || !authReady ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                {busy ? "Fetching…" : !authReady ? "Checking…" : "Fetch media"}
               </Button>
             </div>
 
@@ -532,15 +556,15 @@ function Home() {
                 variant="ghost"
                 size="sm"
                 onClick={handleFetchMetadata}
-                disabled={metaBusy || !url.trim()}
+                disabled={metaBusy || !authReady || !url.trim()}
                 className="h-9 text-xs"
               >
-                {metaBusy ? (
+                {metaBusy || !authReady ? (
                   <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                 ) : (
                   <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
                 )}
-                {metaBusy ? "Reading…" : "Get thumbnail & info"}
+                {metaBusy ? "Reading…" : !authReady ? "Checking…" : "Get thumbnail & info"}
               </Button>
             </div>
 
