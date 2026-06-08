@@ -152,7 +152,14 @@ function Home() {
     if (!authReady) {
       await refreshUsage();
     }
-    const { data } = await supabase.auth.getSession();
+    let { data } = await supabase.auth.getSession();
+    if (!data.session) {
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData.user) {
+        const refreshed = await supabase.auth.getSession();
+        data = refreshed.data;
+      }
+    }
     if (data.session) {
       setSignedIn(true);
       return data.session;
@@ -368,7 +375,7 @@ function Home() {
       setResult({ url: res.url, filename: res.filename, mode });
       toast.success("Your file is ready");
       await saveHistory("ready");
-      if (!signedIn) bumpAnonUsage();
+      if (!isSignedIn) bumpAnonUsage();
       refreshUsage();
     } catch (err) {
       console.error(err);
@@ -697,9 +704,15 @@ function Home() {
             Create a free account to track your history, save favorite links, and unlock unlimited fetches.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Button asChild size="lg" className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow">
-              <Link to="/login" search={{ mode: "signup" }}>Get started — free</Link>
-            </Button>
+            {signedIn ? (
+              <Button asChild size="lg" className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow">
+                <Link to="/dashboard">Open dashboard</Link>
+              </Button>
+            ) : (
+              <Button asChild size="lg" className="bg-gradient-brand text-primary-foreground hover:opacity-90 shadow-glow">
+                <Link to="/login" search={{ mode: "signup" }}>Get started — free</Link>
+              </Button>
+            )}
             <Button asChild size="lg" variant="ghost">
               <Link to="/pricing">See pricing →</Link>
             </Button>

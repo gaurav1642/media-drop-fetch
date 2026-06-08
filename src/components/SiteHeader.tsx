@@ -21,7 +21,7 @@ export function SiteHeader() {
       if (mounted) setAuthed(!!data.session);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED" && event !== "TOKEN_REFRESHED") return;
+      if (event !== "INITIAL_SESSION" && event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED" && event !== "TOKEN_REFRESHED") return;
       if (mounted) setAuthed(!!s);
     });
     return () => {
