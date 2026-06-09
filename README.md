@@ -43,7 +43,6 @@ MediaDrop is a modern media downloader built with React, TypeScript, TanStack St
 
 ### 🌐 Multi-Platform Support
 
-* YouTube
 * Instagram
 * TikTok
 * Facebook
